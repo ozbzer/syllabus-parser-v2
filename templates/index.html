@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Syllabus Parser</title>
+    <style>
+        .disclaimer {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 16px;
+            margin: 24px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #664d03;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+       .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin-top: 0;
+            color: #1d1d1f;
+        }
+        input[type="file"] {
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background: #0051D5;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+       .event {
+            background: #f9f9f9;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            border-left: 3px solid #007AFF;
+        }
+       .event strong {
+            color: #1d1d1f;
+        }
+        #downloadBtn {
+            display: none;
+            margin-top: 20px;
+            background: #34C759;
+        }
+        #downloadBtn:hover {
+            background: #28A745;
+        }
+        h3 {
+            margin-top: 30px;
+            color: #1d1d1f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Syllabus Parser</h1>
+        <p>Upload your syllabus PDF or DOCX. We'll extract all deadlines and create prep events.</p>
+
+        <input type="file" id="fileInput" accept=".pdf,.docx">
+        <br>
+        <button id="analyzeBtn" onclick="analyzeSyllabus()">Analyze Syllabus</button>
+
+        <div id="status"></div>
+        <div id="results"></div>
+        <button id="downloadBtn" onclick="downloadCalendar()">Download Calendar</button>
+    </div>
+
+    <script>
+        let calendarData = null;
+
+        function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00'); // Force local timezone
+    const options = { day: 'numeric', month: 'long', year: 'numeric' };
+    return date.toLocaleDateString('en-GB', options); // Returns "13 February 2026"
+}
+
+        async function analyzeSyllabus() {
+            const fileInput = document.getElementById('fileInput');
+            const status = document.getElementById('status');
+            const results = document.getElementById('results');
+            const btn = document.getElementById('analyzeBtn');
+
+            if (!fileInput.files[0]) {
+                status.textContent = 'Please select a file first.';
+                return;
+            }
+
+            btn.disabled = true;
+            status.textContent = 'Analyzing... this takes 5-15 seconds.';
+            results.innerHTML = '';
+            document.getElementById('downloadBtn').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Analysis failed');
+                }
+
+                const data = await response.json();
+                calendarData = data.ics_content;
+
+                status.textContent = `Found ${data.deadlines.length} deadlines`;
+
+                let html = '<h3>Deadlines Found:</h3>';
+                data.deadlines.forEach(d => {
+                   html += `<div class="event"><strong>${d.title}</strong> — ${formatDate(d.date)}<br><small>${d.description || ''}</small></div>`;
+                });
+
+                html += '<h3>Prep Events:</h3>';
+                data.prep_events.forEach(p => {
+                    html += `<div class="event"><strong>${p.title}</strong> — ${formatDate(p.date)}<br><small>${p.description || ''}</small></div>`;            
+                });
+
+                html += `
+                <div class="disclaimer">
+                    <strong>⚠️ AI can make mistakes.</strong><br>
+                    Always double-check these dates against your official syllabus before adding to your calendar or relying on them for assignments.
+                </div>
+                `;
+
+                results.innerHTML = html;
+                document.getElementById('downloadBtn').style.display = 'block';
+
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function downloadCalendar() {
+            if (!calendarData) return;
+            const blob = new Blob([calendarData], { type: 'text/calendar' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'syllabus_calendar.ics';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
