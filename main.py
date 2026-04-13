@@ -66,6 +66,7 @@ Each item in the array must follow this format:
 }}
 
 Rules:
+- Prioritize course-related deadlines over administrative/university-wide deadlines
 - Only include items that have a clear due date or scheduled date.
 - Do not guess missing dates or times.
 - If the date is missing, do not include the item.
@@ -100,21 +101,21 @@ def generate_prep_events(title, due_date, task_type):
     clean_title = clean_title.replace("Take-Home Exam", "Exam")
     # Step 1: decide prep steps 
     if task_type == "assignment":
-        steps = [("Research", 7), ("Outline", 5), ("Draft", 3), ("Final Edit", 1)]
+        steps = [("Start Draft", 5), ("Final Review", 1)]
     elif task_type == "exam":
-        steps = [("Study Session 1", 6), ("Study Session 2", 3), ("Review", 1)]
+        steps = [("Study Session", 5), ("Review", 1)]
     elif task_type == "quiz":
-        steps = [("Review Notes", 3), ("Practice Questions", 1)]
+        steps = [("Review Notes", 2)]
     elif task_type == "project":
-        steps = [("Plan Project", 10), ("Work Session 1", 7), ("Work Session 2", 4), ("Final Touches", 1)]
+        steps = [("Start Project", 7), ("Work Session", 3), ("Final Review", 1)]
     elif task_type == "presentation":
-        steps = [("Research", 7), ("Slides Draft", 4), ("Practice", 2)]
+        steps = [("Prepare Slides", 4), ("Practice", 1)]
     elif task_type == "reflection":
-        steps = [("Review Notes", 3), ("Draft Reflection", 1)]
+        steps = [("Review Notes", 2), ("Draft", 1)]
     elif task_type == "lab":
-        steps = [("Prepare Materials", 2), ("Review Instructions", 1)]
+        steps = [("Prepare", 1)]
     elif task_type == "deadline":
-        steps = [("Start Task", 5), ("Finish Task", 1)]
+        steps = [("Prepare", 3), ("Submit", 1)]
     else:
         steps = []
 
@@ -123,7 +124,7 @@ def generate_prep_events(title, due_date, task_type):
     for step_name, days_before in steps:
         prep_date = due - timedelta(days=days_before)
 
-        event_title = f"{step_name} for {clean_title}"
+        event_title = f"{clean_title} — {step_name}"
 
         words = event_title.split()
         event_title = " ".join(dict.fromkeys(words))
@@ -147,7 +148,35 @@ def prefer_evaluation_dates(calendar_items):
 
     return list(final.values())
 
-# --- NEW: FastAPI endpoint that replaces all the st.button logic ---
+def group_events(events):
+    assignments = []
+    exams = []
+    others = []
+
+    for event in events:
+        event_type = event.get("type", "").lower()
+        title = event.get("title", "").lower()
+
+        if any(word in title for word in ["assignment", "project", "essay", "paper", "reflection", "presentation"]):
+            assignments.append(event)
+
+        elif any(word in title for word in ["exam", "quiz", "midterm", "final"]):
+            exams.append(event)
+
+        elif event_type in ["assignment", "project"]:
+            assignments.append(event)
+
+        elif event_type in ["exam", "quiz"]:
+            exams.append(event)
+
+        else:
+            others.append(event)
+
+    return assignments, exams, others
+
+def sort_events(events):
+    return sorted(events, key=lambda x: x["date"])
+
 @app.post("/api/analyze")
 async def analyze_syllabus(file: UploadFile = File(...)):
     if not file.filename.endswith((".pdf", ".docx")):
@@ -186,9 +215,27 @@ async def analyze_syllabus(file: UploadFile = File(...)):
     try:
         calendar_items = json.loads(ai_response)
         calendar_items = prefer_evaluation_dates(calendar_items)
+        
+        unique_events = []
+        seen = set()
+
+        for event in calendar_items:
+            key = (event["title"], event["date"])
+            if key not in seen:
+                seen.add(key)
+                unique_events.append(event)
+
+        calendar_items = unique_events
+
+        assignments, exams, others = group_events(calendar_items)
+
+        assignments = sort_events(assignments)
+        exams = sort_events(exams)
+        others = sort_events(others)
+
     except json.JSONDecodeError:
         raise HTTPException(500, "AI response was not valid JSON")
-
+            
     prep_events_lists = []
     for task in calendar_items:
         title = task["title"]
@@ -228,7 +275,10 @@ END:VEVENT
     calendar_text += "END:VCALENDAR\n"
 
     return {
-        "deadlines": calendar_items,
+        "deadlines": calendar_items,   
+        "assignments": assignments,
+        "exams": exams,
+        "others": others,
         "prep_events": prep_events_lists,
         "ics_content": calendar_text
     }

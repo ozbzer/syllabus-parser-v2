@@ -1,0 +1,34 @@
+# Syllabus Parser
+
+Turn your syllabus into a study plan and calendar automatically.
+
+## Features
+
+- Upload PDF or DOCX syllabus
+- Extracts deadlines (assignments, quizzes, exams, etc.)
+- Generates study/prep events
+- Creates downloadable calendar (.ics)
+
+## How it works
+
+1. Upload your syllabus  
+2. Text is extracted  
+3. AI finds important deadlines  
+4. Study plan is generated  
+5. Download your calendar  
+
+## Tech Stack
+
+- Python
+- Streamlit
+- OpenAI API
+- PyPDF
+- python-docx
+
+## Setup
+
+Clone the repo:
+
+```bash
+git clone https://github.com/your-username/syllabus-parser.git
+cd syllabus-parser

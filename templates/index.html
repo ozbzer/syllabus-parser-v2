@@ -139,17 +139,47 @@
                 const data = await response.json();
                 calendarData = data.ics_content;
 
-                status.textContent = `Found ${data.deadlines.length} deadlines`;
+const assignments = data.assignments || [];
+const exams = data.exams || [];
+const others = data.others || [];
+const prepEvents = data.prep_events || [];
 
-                let html = '<h3>Deadlines Found:</h3>';
-                data.deadlines.forEach(d => {
-                   html += `<div class="event"><strong>${d.title}</strong> — ${formatDate(d.date)}<br><small>${d.description || ''}</small></div>`;
-                });
+const total = assignments.length + exams.length + others.length;
+status.textContent = `Found ${total} important dates`;
 
-                html += '<h3>Prep Events:</h3>';
-                data.prep_events.forEach(p => {
-                    html += `<div class="event"><strong>${p.title}</strong> — ${formatDate(p.date)}<br><small>${p.description || ''}</small></div>`;            
-                });
+let html = '';
+
+
+if (assignments.length > 0) {
+    html += '<h3>📚 Assignments</h3>';
+    assignments.forEach(item => {
+        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+    });
+}
+
+
+if (exams.length > 0) {
+    html += '<h3>📝 Exams</h3>';
+    exams.forEach(item => {
+        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+    });
+}
+
+
+if (others.length > 0) {
+    html += '<h3>📌 Important Deadlines</h3>';
+    others.forEach(item => {
+        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+    });
+}
+
+
+if (prepEvents.length > 0) {
+    html += '<h3>Prep Events</h3>';
+    prepEvents.forEach(item => {
+        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}</div>`;
+    });
+}
 
                 html += `
                 <div class="disclaimer">
