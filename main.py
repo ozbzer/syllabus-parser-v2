@@ -1,10 +1,12 @@
+from unittest import skip
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 from pypdf import PdfReader
 from openai import OpenAI
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from docx import Document
 from dotenv import load_dotenv
 
@@ -14,7 +16,7 @@ app = FastAPI()
 
 @app.get("/")
 async def read_index():
-    return FileResponse('templates/index.html')
+    return FileResponse('templates/index.html') 
 
 # --- COPY THESE FUNCTIONS FROM app.py AS-IS ---
 def generate_ai_today_text(syllabus_text, client):
@@ -177,6 +179,23 @@ def group_events(events):
 def sort_events(events):
     return sorted(events, key=lambda x: x["date"])
 
+def validate_output(calendar_items):
+    valid_items = []
+    for item in calendar_items: #loop through every item 
+        errors = [] #creates a fresh error list for each item 
+        if not item.get("date"):
+            errors.append("Missing Date")
+        if not item.get("title"):
+            errors.append("Missing Title")
+        if not item.get("type"):
+            errors.append("Missing Type")
+        
+        item["errors"] = errors  #attaches the error list
+        item["is_valid"] = len(errors) == 0   # quick true/false flag      
+        valid_items.append(item) #ship it 
+
+    return valid_items
+
 @app.post("/api/analyze")
 async def analyze_syllabus(file: UploadFile = File(...)):
     if not file.filename.endswith((".pdf", ".docx")):
@@ -214,6 +233,7 @@ async def analyze_syllabus(file: UploadFile = File(...)):
 
     try:
         calendar_items = json.loads(ai_response)
+        calendar_items = validate_output(calendar_items)
         calendar_items = prefer_evaluation_dates(calendar_items)
         
         unique_events = []
@@ -228,7 +248,6 @@ async def analyze_syllabus(file: UploadFile = File(...)):
         calendar_items = unique_events
 
         assignments, exams, others = group_events(calendar_items)
-
         assignments = sort_events(assignments)
         exams = sort_events(exams)
         others = sort_events(others)

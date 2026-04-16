@@ -3,7 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Syllabus Parser</title>
+
+    <title>Syllabus Parser AI</title>
+    <meta name="description" content="Upload your syllabus (PDF or DOCX) and instantly get all deadlines in a downloadable calendar. Free, fast, and simple.">
+    <meta name="keywords" content="syllabus parser, syllabus to calendar, assignment tracker, student productivity tool, syllabus deadlines">
+
+    <meta property="og:title" content="Syllabus Parser AI">
+    <meta property="og:description" content="Upload your syllabus and instantly get all deadlines in a downloadable calendar. Free and simple.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.syllabusparserai.com">
+
     <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-397EX4ZLS5"></script>
 <script>
@@ -93,8 +102,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>Syllabus Parser</h1>
-        <p>Upload your syllabus PDF or DOCX. We'll extract all deadlines and create prep events.</p>
+        <h1>Syllabus Parser AI</h1>
+        <p>Upload your syllabus (PDF or DOCX) and instantly get all deadlines in a downloadable calendar. Free and simple.</p>
 
         <input type="file" id="fileInput" accept=".pdf,.docx">
         <br>
@@ -192,7 +201,7 @@ if (prepEvents.length > 0) {
 
                 html += `
                 <div class="disclaimer">
-                    <strong>⚠️ AI can make mistakes.</strong><br>
+                    <strong>AI can make mistakes.</strong><br>
                     Always double-check these dates against your official syllabus before adding to your calendar or relying on them for assignments.
                 </div>
                 `;
@@ -210,6 +219,10 @@ if (prepEvents.length > 0) {
 
         function downloadCalendar() {
             if (!calendarData) return;
+
+            if (typeof gtag === "function") {
+                gtag('event', 'download_calendar');
+            }
             const blob = new Blob([calendarData], { type: 'text/calendar' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
