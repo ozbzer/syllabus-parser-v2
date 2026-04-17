@@ -18,10 +18,21 @@
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
 
-  gtag('config', 'G-397EX4ZLS5');
+gtag('js', new Date());
+gtag('config', 'G-397EX4ZLS5');
+
 </script>
+
+<script>
+  function trackEvent(eventName, params = {}) {
+    if (typeof gtag === "function") { 
+      gtag("event", eventName, params);
+      console.log("Tracked:", eventName, params);
+    }
+  }
+</script>
+
     <style>
         .disclaimer {
             background: #fff3cd;
@@ -135,6 +146,15 @@
                 return;
             }
 
+            const file = fileInput.files[0];
+            const fileType = file.name.split('.').pop().toLowerCase();
+
+            trackEvent("upload_syllabus", {
+                file_name: file.name,
+                file_type: fileType
+            });
+
+
             btn.disabled = true;
             status.textContent = 'Analyzing... this takes 5-15 seconds.';
             results.innerHTML = '';
@@ -163,6 +183,13 @@ const others = data.others || [];
 const prepEvents = data.prep_events || [];
 
 const total = assignments.length + exams.length + others.length;
+trackEvent("parse_success", {
+    total_items: total,
+    assignment_count: assignments.length,
+    exam_count: exams.length,
+    other_count: others.length,
+    prep_count: prepEvents.length
+});
 status.textContent = `Found ${total} important dates`;
 
 let html = '';
@@ -211,6 +238,9 @@ if (prepEvents.length > 0) {
 
             } catch (error) {
                 status.textContent = 'Error: ' + error.message;
+                trackEvent("parse_error", {
+                    message: error.message
+                });
                 console.error(error);
             } finally {
                 btn.disabled = false;
@@ -220,9 +250,9 @@ if (prepEvents.length > 0) {
         function downloadCalendar() {
             if (!calendarData) return;
 
-            if (typeof gtag === "function") {
-                gtag('event', 'download_calendar');
-            }
+        trackEvent("download_calendar", {
+            format: "ics"
+        });
             const blob = new Blob([calendarData], { type: 'text/calendar' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
