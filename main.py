@@ -86,6 +86,12 @@ Rules:
 - Only include an item if you can provide a short exact supporting excerpt from the syllabus.
 - If the date is uncertain or conflicting, prefer the item with clearer evidence from an evaluation/grading section.
 - If no valid calendar items are found, return [].
+- Classification rules for "type":
+  - Only classify an item as "exam" if it explicitly includes words like "exam", "midterm", "test", or "quiz"
+  - Do NOT classify an item as "exam" just because it contains the word "final"
+  - Items such as "final project", "final paper", "final portfolio", "final assignment" must be classified as "assignment"
+  - If an item contains both "final" and assignment-related words (e.g., project, paper, portfolio, assignment), classify it as "assignment"
+  - Words like "assignment", "project", "paper", "essay", "portfolio", "submission", "reflection", "plan", "create" should strongly indicate type "assignment"
 
 Syllabus text:
 {syllabus_text}
