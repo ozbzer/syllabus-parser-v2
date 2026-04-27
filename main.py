@@ -1,9 +1,10 @@
+from typing import List
 from unittest import skip
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 from pypdf import PdfReader
-from openai import OpenAI
+from openai import OpenAI, files
 import os
 import json
 from datetime import date, datetime, timedelta
@@ -52,19 +53,22 @@ Do NOT include in Deadlines Found:
 - location information
 - announcements without a deadline
 
-Return only valid JSON.
 Do not return explanations, markdown, headings, or extra text.
 
-Return a JSON array.
-Each item in the array must follow this format:
+Return a JSON object with this exact structure:
 {{
-  "title": "string",
-  "type": "assignment | quiz | exam | project | presentation | lab | reading | reflection | paper | essay | report | lab | deadline",
-  "date": "YYYY-MM-DD or null",
-  "time": "HH:MM or null",
-  "description": "short helpful detail or null",
-  "source_section": "evaluation | schedule | other",
-  "evidence_text": "exact short quote or excerpt from the syllabus supporting the date"
+    "course_name": "short course name extracted from the syllabus, e.g. 'COMP 1234 - Intro to Programming'",
+    "events": [
+    {{
+        "title": "string",
+        "type": "assignment | quiz | exam | project | presentation | lab | reading | reflection | paper | essay | report | lab | deadline",
+        "date": "YYYY-MM-DD or null",
+        "time": "HH:MM or null",
+        "description": "short helpful detail or null",
+        "source_section": "evaluation | schedule | other",
+        "evidence_text": "exact short quote or excerpt from the syllabus supporting the date"
+        }}
+    ] 
 }}
 
 Rules:
@@ -203,107 +207,111 @@ def validate_output(calendar_items):
     return valid_items
 
 @app.post("/api/analyze")
-async def analyze_syllabus(file: UploadFile = File(...)):
-    if not file.filename.endswith((".pdf", ".docx")):
-        raise HTTPException(400, "Only PDF & DOCX files accepted")
+async def analyze_syllabus(files: List[UploadFile] = File(...)):
 
-    syllabus_text = ""
+    results = []
+    for file in files:
+        syllabus_text = ""
 
-    if file.filename.endswith(".pdf"):
-        pdf_reader = PdfReader(file.file)
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                syllabus_text += page_text + "\n"
+        if file.filename.endswith(".pdf"):
+            pdf_reader = PdfReader(file.file)
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    syllabus_text += page_text + "\n"
 
-    elif file.filename.endswith(".docx"):
-        doc = Document(file.file)
-        for para in doc.paragraphs:
-            if para.text.strip():
-                syllabus_text += para.text.strip() + "\n"
-        for table in doc.tables:
-            for row in table.rows:
-                row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                if row_text:
-                    syllabus_text += " | ".join(row_text) + "\n"
+        elif file.filename.endswith(".docx"):
+            doc = Document(file.file)
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    syllabus_text += para.text.strip() + "\n"
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if row_text:
+                        syllabus_text += " | ".join(row_text) + "\n"
+        if not syllabus_text.strip():
+            raise HTTPException(400, "Could not extract text from this file")
 
-    if not syllabus_text.strip():
-        raise HTTPException(400, "Could not extract text from this file")
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(500, "OpenAI API key not found")
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(500, "OpenAI API key not found")
+        client = OpenAI(api_key=api_key)
+        ai_response = generate_ai_today_text(syllabus_text, client)
+    
+        try:
+            parsed = json.loads(ai_response)
+            course_name = parsed.get("course_name")
+            calendar_items = parsed.get("events")
+            calendar_items = validate_output(calendar_items)
+            calendar_items = prefer_evaluation_dates(calendar_items)
 
-    client = OpenAI(api_key=api_key)
-    ai_response = generate_ai_today_text(syllabus_text, client)
+            unique_events = []
+            seen = set()
 
-    try:
-        calendar_items = json.loads(ai_response)
-        calendar_items = validate_output(calendar_items)
-        calendar_items = prefer_evaluation_dates(calendar_items)
-        
-        unique_events = []
-        seen = set()
+            for event in calendar_items:
+                key = (event["title"], event["date"])
+                if key not in seen:
+                    seen.add(key)
+                    unique_events.append(event)
 
-        for event in calendar_items:
-            key = (event["title"], event["date"])
-            if key not in seen:
-                seen.add(key)
-                unique_events.append(event)
+            calendar_items = unique_events
 
-        calendar_items = unique_events
+            assignments, exams, others = group_events(calendar_items)
+            assignments = sort_events(assignments)
+            exams = sort_events(exams)
+            others = sort_events(others)
 
-        assignments, exams, others = group_events(calendar_items)
-        assignments = sort_events(assignments)
-        exams = sort_events(exams)
-        others = sort_events(others)
+        except json.JSONDecodeError:
+            raise HTTPException(500, "AI response was not valid JSON")
 
-    except json.JSONDecodeError:
-        raise HTTPException(500, "AI response was not valid JSON")
+        prep_events_lists = []
+        for task in calendar_items:
+            title = task["title"]
+            due_date = task["date"]
+            task_type = task["type"]
+            if not due_date:
+                continue
+            prep_events = generate_prep_events(title, due_date, task_type)
+            prep_events_lists.extend(prep_events)
+
+        calendar_text = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Syllabus Parser//EN\n"
+        for item in calendar_items:
+            title = item["title"]
+            date = item["date"]
+            if not date:
+                continue
+            description = item.get("description", "")
+            event_text = f"""BEGIN:VEVENT
+    SUMMARY:{title}
+    DTSTART;VALUE=DATE:{date.replace("-", "")}
+    DESCRIPTION:{description if description else ""}
+    END:VEVENT
+    """
+            calendar_text += event_text
+
+        for prep_event in prep_events_lists:
+            title = prep_event["title"]
+            date = prep_event["date"]
+            event_text = f"""BEGIN:VEVENT
+    SUMMARY:{title}
+    DTSTART;VALUE=DATE:{date.replace("-", "")}
+    END:VEVENT
+    """
+            calendar_text += event_text
+
+        calendar_text += "END:VCALENDAR\n"
+
+        results.append({
+            "course_name": course_name,
+            "deadlines": calendar_items,
+            "assignments": assignments,
+            "exams": exams,
+            "others": others,
+            "prep_events": prep_events_lists,
+            "ics_file": calendar_text
+        })
+
+    return {"courses": results}
             
-    prep_events_lists = []
-    for task in calendar_items:
-        title = task["title"]
-        due_date = task["date"]
-        task_type = task["type"]
-        if not due_date:
-            continue
-        prep_events = generate_prep_events(title, due_date, task_type)
-        prep_events_lists.extend(prep_events)
-
-    # Build ICS file text
-    calendar_text = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Syllabus Parser//EN\n"
-    for item in calendar_items:
-        title = item["title"]
-        date = item["date"]
-        if not date:
-            continue
-        description = item.get("description", "")
-        event_text = f"""BEGIN:VEVENT
-SUMMARY:{title}
-DTSTART;VALUE=DATE:{date.replace("-", "")}
-DESCRIPTION:{description if description else ""}
-END:VEVENT
-"""
-        calendar_text += event_text
-
-    for prep_event in prep_events_lists:
-        title = prep_event["title"]
-        date = prep_event["date"]
-        event_text = f"""BEGIN:VEVENT
-SUMMARY:{title}
-DTSTART;VALUE=DATE:{date.replace("-", "")}
-END:VEVENT
-"""
-        calendar_text += event_text
-
-    calendar_text += "END:VCALENDAR\n"
-
-    return {
-        "deadlines": calendar_items,   
-        "assignments": assignments,
-        "exams": exams,
-        "others": others,
-        "prep_events": prep_events_lists,
-        "ics_content": calendar_text
-    }

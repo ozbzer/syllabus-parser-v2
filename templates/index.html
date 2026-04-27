@@ -14,24 +14,23 @@
     <meta property="og:url" content="https://www.syllabusparserai.com">
 
     <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-397EX4ZLS5"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-397EX4ZLS5"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
 
-gtag('js', new Date());
-gtag('config', 'G-397EX4ZLS5');
+        gtag('js', new Date());
+        gtag('config', 'G-397EX4ZLS5');
+    </script>
 
-</script>
-
-<script>
-  function trackEvent(eventName, params = {}) {
-    if (typeof gtag === "function") { 
-      gtag("event", eventName, params);
-      console.log("Tracked:", eventName, params);
-    }
-  }
-</script>
+    <script>
+        function trackEvent(eventName, params = {}) {
+            if (typeof gtag === "function") { 
+                gtag("event", eventName, params);
+                console.log("Tracked:", eventName, params);
+            }
+        }
+    </script>
 
     <style>
         .disclaimer {
@@ -51,20 +50,28 @@ gtag('config', 'G-397EX4ZLS5');
             padding: 20px;
             background: #f5f5f5;
         }
-       .container {
+
+        #downloadBtn:hover {
+            background: #28A745;
+        }
+
+        .container {
             background: white;
             padding: 40px;
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+
         h1 {
             margin-top: 0;
             color: #1d1d1f;
         }
+
         input[type="file"] {
             margin: 20px 0;
             font-size: 14px;
         }
+
         button {
             background: #007AFF;
             color: white;
@@ -75,36 +82,49 @@ gtag('config', 'G-397EX4ZLS5');
             cursor: pointer;
             font-weight: 500;
         }
+
         button:hover {
             background: #0051D5;
         }
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
+
         #status {
             margin-top: 20px;
             color: #666;
             font-size: 14px;
         }
-       .event {
+
+        .event {
             background: #f9f9f9;
             padding: 12px;
             margin: 8px 0;
             border-radius: 6px;
             border-left: 3px solid #007AFF;
         }
-       .event strong {
+
+        .event strong {
             color: #1d1d1f;
         }
+
         #downloadBtn {
             display: none;
             margin-top: 20px;
             background: #34C759;
         }
+
+        #uploadAnotherBtn {
+            background: #007AFF;
+            margin-top: 20px;
+        }
+
         #downloadBtn:hover {
             background: #28A745;
         }
+
         h3 {
             margin-top: 30px;
             color: #1d1d1f;
@@ -116,143 +136,139 @@ gtag('config', 'G-397EX4ZLS5');
         <h1>Syllabus Parser AI</h1>
         <p>Upload your syllabus (PDF or DOCX) and instantly get all deadlines in a downloadable calendar. Free and simple.</p>
 
-        <input type="file" id="fileInput" accept=".pdf,.docx">
+        <input type="file" id="fileInput" accept=".pdf,.docx" multiple>
         <br>
         <button id="analyzeBtn" onclick="analyzeSyllabus()">Analyze Syllabus</button>
 
         <div id="status"></div>
         <div id="results"></div>
         <button id="downloadBtn" onclick="downloadCalendar()">Download Calendar</button>
+        <button id="uploadAnotherBtn" onclick="location.reload()" style="display:none;">Upload Another Syllabus</button>
     </div>
 
     <script>
-        let calendarData = null;
+        let calendarData = [];
 
         function formatDate(dateStr) {
-    if (!dateStr) return '';
-    const date = new Date(dateStr + 'T00:00:00'); // Force local timezone
-    const options = { day: 'numeric', month: 'long', year: 'numeric' };
-    return date.toLocaleDateString('en-GB', options); // Returns "13 February 2026"
-}
-
-        async function analyzeSyllabus() {
-            const fileInput = document.getElementById('fileInput');
-            const status = document.getElementById('status');
-            const results = document.getElementById('results');
-            const btn = document.getElementById('analyzeBtn');
-
-            if (!fileInput.files[0]) {
-                status.textContent = 'Please select a file first.';
-                return;
-            }
-
-            const file = fileInput.files[0];
-            const fileType = file.name.split('.').pop().toLowerCase();
-
-            trackEvent("upload_syllabus", {
-                file_name: file.name,
-                file_type: fileType
-            });
-
-
-            btn.disabled = true;
-            status.textContent = 'Analyzing... this takes 5-15 seconds.';
-            results.innerHTML = '';
-            document.getElementById('downloadBtn').style.display = 'none';
-
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-
-            try {
-                const response = await fetch('/api/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Analysis failed');
-                }
-
-                const data = await response.json();
-                calendarData = data.ics_content;
-
-const assignments = data.assignments || [];
-const exams = data.exams || [];
-const others = data.others || [];
-const prepEvents = data.prep_events || [];
-
-const total = assignments.length + exams.length + others.length;
-trackEvent("parse_success", {
-    total_items: total,
-    assignment_count: assignments.length,
-    exam_count: exams.length,
-    other_count: others.length,
-    prep_count: prepEvents.length
-});
-status.textContent = `Found ${total} important dates`;
-
-let html = '';
-
-
-if (assignments.length > 0) {
-    html += '<h3>📚 Assignments</h3>';
-    assignments.forEach(item => {
-        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
-    });
-}
-
-
-if (exams.length > 0) {
-    html += '<h3>📝 Exams</h3>';
-    exams.forEach(item => {
-        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
-    });
-}
-
-
-if (others.length > 0) {
-    html += '<h3>📌 Important Deadlines</h3>';
-    others.forEach(item => {
-        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
-    });
-}
-
-
-if (prepEvents.length > 0) {
-    html += '<h3>Prep Events</h3>';
-    prepEvents.forEach(item => {
-        html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}</div>`;
-    });
-}
-
-                html += `
-                <div class="disclaimer">
-                    <strong>AI can make mistakes.</strong><br>
-                    Always double-check these dates against your official syllabus before adding to your calendar or relying on them for assignments.
-                </div>
-                `;
-
-                results.innerHTML = html;
-                document.getElementById('downloadBtn').style.display = 'block';
-
-            } catch (error) {
-                status.textContent = 'Error: ' + error.message;
-                trackEvent("parse_error", {
-                    message: error.message
-                });
-                console.error(error);
-            } finally {
-                btn.disabled = false;
-            }
+            if (!dateStr) return '';
+            const date = new Date(dateStr + 'T00:00:00'); // Force local timezone
+            const options = { day: 'numeric', month: 'long', year: 'numeric' };
+            return date.toLocaleDateString('en-GB', options); // Returns "13 February 2026"
         }
+
+async function analyzeSyllabus() {
+    const fileInput = document.getElementById('fileInput');
+    const status = document.getElementById('status');
+    const results = document.getElementById('results');
+    const btn = document.getElementById('analyzeBtn');
+
+    if (!fileInput.files[0]) {
+        status.textContent = 'Please select a file first.';
+        return;
+    }
+
+    btn.disabled = true;
+    status.textContent = 'Analyzing... this takes 5-15 seconds.';
+    document.getElementById('downloadBtn').style.display = 'none';
+
+    const formData = new FormData();
+
+    for (let i = 0; i < fileInput.files.length; i++) {
+        const file = fileInput.files[i];
+        const fileType = file.name.split('.').pop().toLowerCase();
+        trackEvent("upload_syllabus", { file_name: file.name, file_type: fileType });
+        formData.append('files', file);
+    }
+
+    try {
+        status.textContent = 'Analyzing your syllabi...';
+
+        const response = await fetch('/api/analyze', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Analysis failed');
+        }
+
+        const data = await response.json();
+
+        data.courses.forEach(course => {
+            calendarData.push(course.ics_file);
+
+            const assignments = course.assignments || [];
+            const exams = course.exams || [];
+            const others = course.others || [];
+            const prepEvents = course.prep_events || [];
+
+            const total = assignments.length + exams.length + others.length;
+            trackEvent("parse_success", {
+                total_items: total,
+                assignment_count: assignments.length,
+                exam_count: exams.length,
+                other_count: others.length,
+                prep_count: prepEvents.length
+            });
+            status.textContent = `Found ${total} important dates`;
+
+            let html = `<h2>${course.course_name}</h2>`;
+
+            if (assignments.length > 0) {
+                html += '<h3>📚 Assignments</h3>';
+                assignments.forEach(item => {
+                    html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+                });
+            }
+
+            if (exams.length > 0) {
+                html += '<h3>📝 Exams</h3>';
+                exams.forEach(item => {
+                    html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+                });
+            }
+
+            if (others.length > 0) {
+                html += '<h3>📌 Important Deadlines</h3>';
+                others.forEach(item => {
+                    html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}<br><small>${item.description || ''}</small></div>`;
+                });
+            }
+
+            if (prepEvents.length > 0) {
+                html += '<h3>Prep Events</h3>';
+                prepEvents.forEach(item => {
+                    html += `<div class="event"><strong>${item.title}</strong> — ${formatDate(item.date)}</div>`;
+                });
+            }
+
+            results.innerHTML += html;
+        });
+        results.innerHTML += `
+            <div class="disclaimer">
+                    <strong>AI can make mistakes.</strong><br>
+                    Always double-check these dates against your official syllabus.
+            </div>`;
+
+        document.getElementById('downloadBtn').style.display = 'block';
+        document.getElementById('uploadAnotherBtn').style.display = 'block';
+
+    } catch (error) {
+        status.textContent = 'Error: ' + error.message;
+        trackEvent("parse_error", { message: error.message });
+        console.error(error);
+    } finally {
+        btn.disabled = false;
+    }
+}
 
         function downloadCalendar() {
             if (!calendarData) return;
 
-        trackEvent("download_calendar", {
-            format: "ics"
-        });
+            trackEvent("download_calendar", {
+                format: "ics"
+            });
             const blob = new Blob([calendarData], { type: 'text/calendar' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
