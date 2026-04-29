@@ -187,7 +187,19 @@ def group_events(events):
     return assignments, exams, others
 
 def sort_events(events):
-    return sorted(events, key=lambda x: x["date"])
+    return sorted(events, key=lambda x: x["date"] or "")
+
+def detect_conflicts(results):
+    conflict = {}
+    for course in results:
+        for event in course["deadlines"]:
+            date = event["date"]
+            if date not in conflict:
+                conflict[date] = []
+            conflict[date].append(event["title"])
+
+    return {date: events for date, events in conflict.items() if len(events) > 1}
+
 
 def validate_output(calendar_items):
     valid_items = []
@@ -312,6 +324,6 @@ async def analyze_syllabus(files: List[UploadFile] = File(...)):
             "prep_events": prep_events_lists,
             "ics_file": calendar_text
         })
-
-    return {"courses": results}
+    conflicts = detect_conflicts(results)
+    return {"courses": results, "conflicts": conflicts}
             

@@ -43,6 +43,16 @@
             color: #664d03;
         }
 
+        .conflict {
+            background: #ffdeee;
+            border-left: 4px solid #dc3545;
+            padding: 16px;
+            margin: 24px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #842029;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             max-width: 700px;
@@ -245,6 +255,16 @@ async function analyzeSyllabus() {
 
             results.innerHTML += html;
         });
+
+        // conflicts warning 
+        if (Object.keys(data.conflicts).length > 0) {
+            Object.entries(data.conflicts).forEach(([date, events]) => {
+                results.innerHTML += `<div class="conflict">
+                   🔔 Reminder! You have ${events.length} things due on ${formatDate(date)}: ${events.join(', ')}
+                </div>`;
+            });
+        }
+
         results.innerHTML += `
             <div class="disclaimer">
                     <strong>AI can make mistakes.</strong><br>
